@@ -22,6 +22,10 @@
    See [Implement notification in Telegram when agent was installed](https://github.com/fusioninventory/fusioninventory-agent/pull/256/commits/86c9f85516e89394523ef5641911974cfc684326) or #256  
    [Download](https://github.com/fusioninventory/fusioninventory-agent/raw/86c9f85516e89394523ef5641911974cfc684326/contrib/windows/fusioninventory-agent-deployment.vbs), thanks to @wanderleihuttel
 
+ * [fusioninventory-agent-deployment.vbs](contrib/windows/fusioninventory-agent-deployment.vbs) with Command line support  
+   See [Added Command Line to fusioninventory-agent-deployment.vbs](https://fusioninventory.userecho.com/communities/1/topics/86-added-command-line-to-fusioninventory-agent-deploymentvbs)  
+   [Download](https://github.com/proyectotau/fusioninventory-agent/blob/develop/contrib/windows/fusioninventory-agent-deployment.vbs), thanks to @proyectotau
+
 ## Submit your contribs
 
  * Clone [FusionInventory-Agent github repository](https://github.com/fusioninventory/fusioninventory-agent)

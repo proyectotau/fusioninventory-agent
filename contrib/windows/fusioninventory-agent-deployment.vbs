@@ -122,6 +122,94 @@ Force = "No"
 Verbose = "No"
 
 '
+' Minimalist version of getopts
+' Usage:
+' Set args = Wscript.Arguments
+' Verbose = GetOpt(args, "/Verbose", "No")
+' See: MAIN section!
+'
+Function GetOpt(args, opt, def)
+Dim LString, LArray, arg
+
+	GetOpt = def
+	For Each arg In args
+		LArray = Split(arg, "=")
+		If (LCase(LArray(0)) = LCase(opt)) Then
+			If(Ubound(LArray) = 0) Then
+				GetOpt = "Yes"
+			Else
+				GetOpt = LArray(1)
+			End If
+			If LCase(LArray(0)) = "/advance" And Not IsNumeric(GetOpt) Then
+				ShowMessage("/Advance must be an Integer value.")
+				ShowMessage("Deployment aborted!")
+				WScript.Quit 4
+			End If
+			If LCase(LArray(0)) = "/options" And GetOpt = "Yes" Then
+				ShowMessage("/Options must have value.")
+				ShowMessage("Deployment aborted!")
+				WScript.Quit 5
+			End If
+			Exit Function
+		End If
+	Next
+End Function
+
+Function RunOrDie(strCmd)
+Dim intReturn
+
+	intReturn = 0
+	' ShowMessage(strCmd)
+	If (LCase(DryRun) = "no") Then
+		intReturn = WshShell.Run(strCmd, 0, True)
+	End If
+	If intReturn <> 0 Then
+		ShowMessage("Error running program: " & intReturn)
+		WScript.Quit intReturn
+	End If
+End Function
+
+' For debuging purpose only !!
+Function DumpParamsAndDie()
+Wscript.Echo "SetupVersion: " & 	SetupVersion
+Wscript.Echo "SetupLocation: " & 	SetupLocation
+Wscript.Echo "SetupArchitecture: " & SetupArchitecture
+Wscript.Echo "Force: " & 			Force
+Wscript.Echo "nMinutesToAdvance: " & nMinutesToAdvance
+Wscript.Echo "Verbose: " & 			Verbose
+Wscript.Echo "DryRun: " & 			DryRun
+Wscript.Echo "Setup: " & 			Setup
+Wscript.Echo "Help: " & 			Help
+Wscript.Echo "Options: " & 			SetupOptions
+WScript.Quit 0
+End Function
+
+Function Usage()
+Verbose="Yes"
+ShowMessage("Usage: fusioninventory-agent-deployment [options ...]")
+ShowMessage(" ")
+ShowMessage("	/Version=X.Y.Z")
+ShowMessage("	/Location=" & Chr(34) & "http[s]://host[:port]/[absolut_path]" & Chr(34) & " | " & Chr(34) & "\\host\share\[path]" & Chr(34))
+ShowMessage("	/Arch=x86 | x64 | Auto")
+ShowMessage("	/Force[=Yes or No]")
+ShowMessage("	/Advance=Minutes")
+ShowMessage("	/Verbose[=Yes or No]")
+ShowMessage("	/DryRun[=Yes or No]")
+ShowMessage("	/Help")
+ShowMessage("	/Options=/S /acceptlicense /runnow etc ...")
+ShowMessage(" ")
+ShowMessage("Missing options take the default value defined within the Script.")
+ShowMessage("Present options without explicit value take the value Yes.")
+ShowMessage(" ")
+ShowMessage("Examples:")
+ShowMessage("	fusioninventory-agent-deployment /help							just this usage")
+ShowMessage("	fusioninventory-agent-deployment /advance=15						must be an Integer value")
+ShowMessage("	fusioninventory-agent-deployment /verbose /dryrun					for verbose dummy run")
+ShowMessage("	fusioninventory-agent-deployment /dryrun						for silenced dummy run")
+ShowMessage("	fusioninventory-agent-deployment /dryrun /options=" & Chr(34) & "/S /acceptlicense /runnow etc ..." & Chr(34) & "	testing your options!")
+End Function
+
+'
 '
 ' DO NOT EDIT BELOW
 '
@@ -349,9 +437,34 @@ End Function
 '
 
 Dim nMinutesToAdvance, strCmd, strSystemArchitecture, strTempDir, WshShell
+Dim args, DryRun, Help, Saved
 Set WshShell = WScript.CreateObject("WScript.shell")
 
+DryRun = "No"
+Help = "No"
+
 nMinutesToAdvance = 5
+
+Set args = Wscript.Arguments
+Verbose           = GetOpt(args, "/Verbose", Verbose)
+Help              = GetOpt(args, "/Help",    Help)
+DryRun            = GetOpt(args, "/DryRun",  DryRun)
+SetupVersion      = GetOpt(args, "/Version", SetupVersion)
+SetupLocation     = GetOpt(args, "/Location",SetupLocation)
+SetupArchitecture = GetOpt(args, "/Arch",    SetupArchitecture)
+Force             = GetOpt(args, "/Force",   Force)
+nMinutesToAdvance = GetOpt(args, "/Advance", nMinutesToAdvance)
+SetupOptions      = GetOpt(args, "/Options", SetupOptions)
+'ReRun Setup:
+Setup = "fusioninventory-agent_windows-" & SetupArchitecture & "_" & SetupVersion & ".exe"
+
+If LCase(Help) = "yes" Then
+	Usage()
+	WScript.Quit 0
+End If
+
+' Retaining Wall
+' DumpParamsAndDie()
 
 ' Get system architecture
 strSystemArchitecture = GetSystemArchitecture()
@@ -397,20 +510,25 @@ End If
 If IsSelectedForce() Or IsInstallationNeeded(SetupVersion, SetupArchitecture, strSystemArchitecture) Then
    If isHttp(SetupLocation) Then
       ShowMessage("Downloading: " & SetupLocation & "/" & Setup)
-      If SaveWebBinary(SetupLocation, Setup) Then
+      If (LCase(DryRun) = "no") Then
+        Saved = SaveWebBinary(SetupLocation, Setup)
+      Else
+        Saved = True
+      End If
+      If Saved Then
          strCmd = WshShell.ExpandEnvironmentStrings("%ComSpec%")
          strTempDir = WshShell.ExpandEnvironmentStrings("%TEMP%")
          ShowMessage("Running: """ & strTempDir & "\" & Setup & """ " & SetupOptions)
-         WshShell.Run """" & strTempDir & "\" & Setup & """ " & SetupOptions, 0, True
+         RunOrDie("""" & strTempDir & "\" & Setup & """ " & SetupOptions)
          ShowMessage("Scheduling: DEL /Q /F """ & strTempDir & "\" & Setup & """")
-         WshShell.Run "AT.EXE " & AdvanceTime(nMinutesToAdvance) & " " & strCmd & " /C ""DEL /Q /F """"" & strTempDir & "\" & Setup & """""", 0, True
+         RunOrDie("AT.EXE " & AdvanceTime(nMinutesToAdvance) & " " & strCmd & " /C ""DEL /Q /F """"" & strTempDir & "\" & Setup & """""")
          ShowMessage("Deployment done!")
       Else
          ShowMessage("Error downloading '" & SetupLocation & "\" & Setup & "'!")
       End If
    Else
       ShowMessage("Running: """ & SetupLocation & "\" & Setup & """ " & SetupOptions)
-      WshShell.Run "CMD.EXE /C """ & SetupLocation & "\" & Setup & """ " & SetupOptions, 0, True
+      RunOrDie("CMD.EXE /C """ & SetupLocation & "\" & Setup & """ " & SetupOptions)
       ShowMessage("Deployment done!")
    End If
 Else
