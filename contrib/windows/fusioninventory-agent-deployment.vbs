@@ -145,10 +145,14 @@ Dim LString, LArray, arg
 				ShowMessage("Deployment aborted!")
 				WScript.Quit 4
 			End If
-			If LCase(LArray(0)) = "/options" And GetOpt = "Yes" Then
-				ShowMessage("/Options must have value.")
-				ShowMessage("Deployment aborted!")
-				WScript.Quit 5
+			If LCase(LArray(0)) = "/options" Then
+				If GetOpt = "Yes" Then
+					ShowMessage("/Options must have value.")
+					ShowMessage("Deployment aborted!")
+					WScript.Quit 5
+				Else
+					GetOpt = Right(arg, Len(arg)-Len("/options="))
+				End If
 			End If
 			Exit Function
 		End If
